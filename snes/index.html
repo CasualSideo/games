@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SNES Player</title>
+<style>
+  :root {
+    --bg: #d9d7e0;
+    --panel: #ecebf1;
+    --ink: #2a2735;
+    --muted: #6a6678;
+    --line: #b9b5c8;
+    --purple: #5b4b8a;
+    --btn-red: #d6403a;
+    --btn-yellow: #e8b92f;
+    --btn-green: #3f9a5a;
+    --btn-blue: #3a68c4;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1d1b26;
+      --panel: #272433;
+      --ink: #ecebf3;
+      --muted: #a29eb3;
+      --line: #3f3b52;
+      --purple: #a597e0;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; min-height: 100%; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "Trebuchet MS", "Segoe UI", system-ui, sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 24px 16px 40px;
+  }
+  header { width: 100%; max-width: 860px; margin-bottom: 20px; }
+  h1 { font-size: 1.6rem; margin: 0 0 4px; letter-spacing: 0.01em; }
+  header p { margin: 0; color: var(--muted); }
+  main { width: 100%; max-width: 860px; }
+
+  #drop {
+    background: var(--panel);
+    border: 2px dashed var(--line);
+    border-radius: 14px;
+    padding: 44px 24px;
+    text-align: center;
+    transition: border-color .15s, background .15s;
+  }
+  #drop.over { border-color: var(--purple); }
+  #drop h2 { margin: 18px 0 6px; font-size: 1.2rem; }
+  #drop p { margin: 0 0 20px; color: var(--muted); }
+
+  .dots { display: inline-grid; grid-template-columns: repeat(2, 22px); gap: 6px; transform: rotate(45deg); margin: 8px 0; }
+  .dots i { width: 22px; height: 22px; border-radius: 50%; display: block; }
+  .dots i:nth-child(1) { background: var(--btn-yellow); }
+  .dots i:nth-child(2) { background: var(--btn-green); }
+  .dots i:nth-child(3) { background: var(--btn-blue); }
+  .dots i:nth-child(4) { background: var(--btn-red); }
+
+  button, .btn {
+    font: inherit;
+    font-weight: 600;
+    background: var(--purple);
+    color: #fff;
+    border: 0;
+    border-radius: 999px;
+    padding: 11px 24px;
+    cursor: pointer;
+  }
+  @media (prefers-color-scheme: dark) { button, .btn { color: #17141f; } }
+  button:focus-visible, .btn:focus-visible, input:focus-visible + label.btn {
+    outline: 3px solid var(--btn-blue);
+    outline-offset: 3px;
+  }
+  button.secondary {
+    background: transparent;
+    color: var(--ink);
+    border: 1px solid var(--line);
+  }
+  input[type=file] { position: absolute; opacity: 0; width: 1px; height: 1px; }
+  label.btn { display: inline-block; }
+
+  #stage { display: none; }
+  #stage.on { display: block; }
+  #wrap {
+    width: 100%;
+    aspect-ratio: 4 / 3;
+    background: #000;
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  #game { width: 100%; height: 100%; }
+  .bar { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 12px; flex-wrap: wrap; }
+  #name { color: var(--muted); font-size: .95rem; overflow-wrap: anywhere; }
+
+  #error { color: var(--btn-red); margin-top: 14px; min-height: 1.2em; }
+
+  details { margin-top: 28px; background: var(--panel); border-radius: 10px; padding: 14px 18px; }
+  summary { cursor: pointer; font-weight: 600; }
+  table { border-collapse: collapse; margin-top: 12px; width: 100%; max-width: 420px; }
+  td { padding: 5px 12px 5px 0; border-bottom: 1px solid var(--line); }
+  td:first-child { color: var(--muted); }
+  footer { margin-top: 24px; color: var(--muted); font-size: .85rem; max-width: 860px; width: 100%; }
+</style>
+</head>
+<body>
+<header>
+  <h1>SNES Player</h1>
+  <p>Play a Super Nintendo game in your browser. Your game file stays on your device.</p>
+</header>
+
+<main>
+  <section id="drop" aria-label="Load a game">
+    <div class="dots" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+    <h2>Drop your SNES game here</h2>
+    <p>Supports .sfc, .smc, .swc, .fig, or a .zip containing one</p>
+    <input type="file" id="file" accept=".sfc,.smc,.swc,.fig,.zip,.7z">
+    <label for="file" class="btn">Choose game file</label>
+    <div id="error" role="alert"></div>
+  </section>
+
+  <section id="stage" aria-label="Game">
+    <div id="wrap"><div id="game"></div></div>
+    <div class="bar">
+      <span id="name"></span>
+      <button class="secondary" id="another">Load a different game</button>
+    </div>
+  </section>
+
+  <details>
+    <summary>Default controls</summary>
+    <table>
+      <tr><td>D-pad</td><td>Arrow keys</td></tr>
+      <tr><td>B / A</td><td>Z / X</td></tr>
+      <tr><td>Y / X</td><td>A / S</td></tr>
+      <tr><td>L / R</td><td>Q / W</td></tr>
+      <tr><td>Start</td><td>Enter</td></tr>
+      <tr><td>Select</td><td>Right Shift</td></tr>
+    </table>
+    <p style="color:var(--muted);margin:12px 0 0">Gamepads work too. Use the gear icon in the player to remap keys, save states, and change settings.</p>
+  </details>
+</main>
+
+<footer>
+  Only load games you own or have the right to use. This page does not include or host any game files.
+  Emulation by <a href="https://emulatorjs.org" target="_blank" rel="noopener">EmulatorJS</a> (Snes9x core).
+</footer>
+
+<script>
+(function () {
+  var drop = document.getElementById('drop');
+  var input = document.getElementById('file');
+  var stage = document.getElementById('stage');
+  var errorEl = document.getElementById('error');
+  var VALID = /\.(sfc|smc|swc|fig|zip|7z)$/i;
+  var DATA_PATH = 'https://cdn.emulatorjs.org/stable/data/';
+
+  function fail(msg) { errorEl.textContent = msg; }
+
+  function start(file) {
+    errorEl.textContent = '';
+    if (!file) return;
+    if (!VALID.test(file.name)) {
+      fail('That file type is not supported. Choose a .sfc, .smc, .swc, .fig, or .zip file.');
+      return;
+    }
+    if (file.size > 64 * 1024 * 1024) {
+      fail('That file is too large to be a SNES game.');
+      return;
+    }
+
+    drop.style.display = 'none';
+    stage.classList.add('on');
+    document.getElementById('name').textContent = file.name;
+
+    window.EJS_player = '#game';
+    window.EJS_core = 'snes9x';
+    window.EJS_gameUrl = URL.createObjectURL(file);
+    window.EJS_gameName = file.name.replace(/\.[^.]+$/, '');
+    window.EJS_pathtodata = DATA_PATH;
+    window.EJS_startOnLoaded = true;
+    window.EJS_color = '#5b4b8a';
+    window.EJS_threads = false; // works on GitHub Pages (no special headers needed)
+
+    var s = document.createElement('script');
+    s.src = DATA_PATH + 'loader.js';
+    s.onerror = function () {
+      stage.classList.remove('on');
+      drop.style.display = '';
+      fail('Could not load the emulator. Check your internet connection and try again.');
+    };
+    document.body.appendChild(s);
+  }
+
+  input.addEventListener('change', function () { start(input.files[0]); });
+
+  ['dragenter', 'dragover'].forEach(function (ev) {
+    drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.add('over'); });
+  });
+  ['dragleave', 'drop'].forEach(function (ev) {
+    drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.remove('over'); });
+  });
+  drop.addEventListener('drop', function (e) {
+    var f = e.dataTransfer && e.dataTransfer.files[0];
+    start(f);
+  });
+
+  // The emulator can't be cleanly torn down, so a reload is the reliable way to switch games.
+  document.getElementById('another').addEventListener('click', function () { location.reload(); });
+})();
+</script>
+</body>
+</html>
